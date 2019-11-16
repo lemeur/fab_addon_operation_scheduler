@@ -6,17 +6,6 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Date, Enum
 from sqlalchemy.orm import relationship
 
 
-"""
-if trigger_name == 'date':
-    trigger_arg_names = ('run_date', 'timezone')
-elif trigger_name == 'interval':
-    trigger_arg_names = ('weeks', 'days', 'hours', 'minutes', 'seconds', 'start_date', 'end_date', 'timezone')
-elif trigger_name == 'cron':
-    trigger_arg_names = ('year', 'month', 'day', 'week', 'day_of_week', 'hour', 'minute', 'second', 'start_date', 'end_date', 'timezone')
-else:
-    raise Exception('Trigger %s is not supported.' % trigger_name)
-""" 
-
 class ListOfOperations:
     members = dict()
 
@@ -37,6 +26,7 @@ class ListOfOperations:
             return cls.members[name]
         else:
             return None
+
 
 class SchedulableOperation(Model):
     oper_name = Column(String(50), primary_key=True)

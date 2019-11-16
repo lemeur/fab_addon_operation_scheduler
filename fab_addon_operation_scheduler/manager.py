@@ -28,7 +28,7 @@ class Config(object):
     ]
 
     SCHEDULER_JOBSTORES = {
-        'default': SQLAlchemyJobStore(url='sqlite:///flask_context.db')
+        'default': SQLAlchemyJobStore(url='sqlite:///fab_addon_operation_scheduler.db')
     }
 
     SCHEDULER_API_ENABLED = True
@@ -43,7 +43,6 @@ class OperationSchedulerManager(BaseManager):
              Use the constructor to setup any config keys specific for your app. 
         """
         super(OperationSchedulerManager, self).__init__(appbuilder)
-        #self.appbuilder.get_app.config.setdefault('OPERATIONSCHEDULER_KEY', 'ACTIVE')
         self.appbuilder.get_app.config.from_object(Config())
         dbsession = appbuilder.get_session()
         dbsession.query(SchedulableOperation).delete()
@@ -61,7 +60,7 @@ class OperationSchedulerManager(BaseManager):
         """
             This method is called by AppBuilder when initializing, use it to add you views
         """
-        self.appbuilder.add_view(ScheduledOperationView, "SchedulableOperations",icon = "fa-user",category = "First AddOn")
+        self.appbuilder.add_view(ScheduledOperationView, "Schedulable_Operations",icon = "fa-user",category = "Scheduler")
 
     def pre_process(self):
         bgsched = BackgroundScheduler(timezone=SCHEDULER_TIMEZONE, daemon=True)
@@ -71,7 +70,7 @@ class OperationSchedulerManager(BaseManager):
 
         if scheduler.get_job('selfcheck'):
             scheduler.remove_job('selfcheck')
-        scheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=30)
+        scheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
 
 
 
