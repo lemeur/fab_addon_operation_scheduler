@@ -1,5 +1,4 @@
 import logging
-#from flask.ext.appbuilder.basemanager import BaseManager
 from flask_appbuilder.basemanager import BaseManager
 from flask_babel import lazy_gettext as _
 from .views import ScheduledOperationView
@@ -60,7 +59,7 @@ class OperationSchedulerManager(BaseManager):
         """
             This method is called by AppBuilder when initializing, use it to add you views
         """
-        self.appbuilder.add_view(ScheduledOperationView, "Schedulable_Operations",icon = "fa-user",category = "Scheduler")
+        self.appbuilder.add_view(ScheduledOperationView, _("Schedulable_Operations"),icon = "fa-user",category = _("Scheduler"))
 
     def pre_process(self):
         bgsched = BackgroundScheduler(timezone=SCHEDULER_TIMEZONE, daemon=True)
@@ -80,6 +79,5 @@ class OperationSchedulerManager(BaseManager):
 def scheduler_selfcheck():
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     OperationSchedulerManager.set_last_check(now)
-    #print("TIBO SCHEDULER SELFCHECK:",OperationSchedulerManager.get_last_check())
-    #print("TIBO SCHEDULER LISTCHECK:",ListOfOperations.get_all())
+    log.debug("fab_addon_operation_scheduler selfcheck:{}".format(now))
 

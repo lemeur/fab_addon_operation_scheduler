@@ -1,0 +1,32 @@
+# French translations for PROJECT.
+# Copyright (C) 2019 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2019-11-22 23:30+0100\n"
+"PO-Revision-Date: 2019-11-22 23:38+0100\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: fr\n"
+"Language-Team: fr <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n > 1)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+#: fab_addon_operation_scheduler/manager.py:62
+msgid "Schedulable_Operations"
+msgstr ""
+
+#: fab_addon_operation_scheduler/manager.py:62
+msgid "Scheduler"
+msgstr ""
+
+#: fab_addon_operation_scheduler/templates/404.html:4
+msgid "Page not found"
+msgstr ""
+

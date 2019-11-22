@@ -3,9 +3,9 @@ VERSION_MINOR = 0
 VERSION_BUILD = 1
 VERSION_INFO = (VERSION_MAJOR, VERSION_MINOR, VERSION_BUILD)
 VERSION_STRING = "%d.%d.%d" % VERSION_INFO
-AUTHOR_NAME = "You name goes here"
-DESCRIPTION = "Small text to resume your addon"
-AUTHOR_EMAIL = "youiremail@somewhere.com"
+AUTHOR_NAME = "Thibault Le Meur"
+DESCRIPTION = "ApScheduler addon for Flask-AppBuilder"
+AUTHOR_EMAIL = "t.lemeur@gmail.com"
 
 __version__ = VERSION_INFO
 

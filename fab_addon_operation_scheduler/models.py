@@ -43,7 +43,7 @@ class SchedulableOperation(Model):
 
 class ScheduledOperation(Model):
     id = Column(Integer, primary_key=True)
-    operation_name = Column(Integer, ForeignKey('schedulable_operation.oper_name'), nullable=False)
+    operation_name = Column(Integer, ForeignKey('schedulable_operation.oper_name'), nullable=True)
     operation = relationship("SchedulableOperation")
     operation_args = Column(String(200), nullable=True)
     scheduler_args = Column(String(200), nullable=True)

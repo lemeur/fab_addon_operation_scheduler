@@ -2,10 +2,11 @@ from flask import render_template
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
 from .models import *
-from .widgets import JsonEditorWidget
 from wtforms import StringField, SelectField
 
 from datetime import datetime
+
+from fab_addon_turbowidgets.widgets import JsonEditorWidget
 
 """
     Create your Views (but don't register them here, do it on the manager::
@@ -207,6 +208,7 @@ class ScheduledOperationView(ModelView):
         "defaultProperties": ["mode","weeks","days","minutes","seconds","start_date","end_date","year","month","day","week","day_of_week","hour","minute","second","timezone","date"]
     }
     before_js = ""
+    # Pre-fill the date when changing the 'mode' in the JsonEditor
     after_js = (
         "function watchMode() {"
             "dt = new Date();"
