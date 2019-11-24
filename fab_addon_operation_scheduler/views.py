@@ -1,12 +1,17 @@
-from flask import render_template
+from flask import render_template, redirect
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
-from .models import *
+from .models import SchedulableOperation, ScheduledOperation
+from .schema import get_schema
 from wtforms import StringField, SelectField
 
 from datetime import datetime
 
 from fab_addon_turbowidgets.widgets import JsonEditorWidget
+
+from flask_appbuilder.actions import action
+
+#from .manager import addon_instance
 
 """
     Create your Views (but don't register them here, do it on the manager::
@@ -20,195 +25,9 @@ from fab_addon_turbowidgets.widgets import JsonEditorWidget
 
 class ScheduledOperationView(ModelView):
     datamodel = SQLAInterface(ScheduledOperation)
-    scheduler_schema = {
-        "type": "object",
-        "title": " ",
-        "required": ["mode","timezone"],
-        "properties": {
-            "mode": {
-                "type": "string",
-                "default": "interval",
-                "propertyOrder": 1,
-                "enum": [
-                    "cron",
-                    "interval",
-                    "date"
-                ]
-            },
-            "timezone": {
-                "type": "string",
-                "propertyOrder": 2,
-                "default": "Europe/Paris",
-                "options": {
-                    "inputAttributes": {
-                        "placeholder":  "Europe/Paris",
-                    }
-                }
-            },
-            "weeks": {
-                "type": "integer",
-                "propertyOrder": 10,
-                "default": 0,
-                "options": {
-                    "dependencies": {
-                        "mode": "interval"
-                    }
-                }
-            },
-            "days": {
-                "type": "integer",
-                "propertyOrder": 11,
-                "default": 1,
-                "options": {
-                    "dependencies": {
-                        "mode": "interval"
-                    }
-                }
-            },
-            "minutes": {
-                "type": "integer",
-                "propertyOrder": 12,
-                "default": 0,
-                "options": {
-                    "dependencies": {
-                        "mode": "interval"
-                    }
-                }
-            },
-            "seconds": {
-                "type": "integer",
-                "propertyOrder": 13,
-                "default": 0,
-                "options": {
-                    "dependencies": {
-                        "mode": "interval"
-                    }
-                }
-            },
-            "year": {
-                "type": "string",
-                "propertyOrder": 20,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "month": {
-                "type": "string",
-                "propertyOrder": 21,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "day": {
-                "type": "string",
-                "propertyOrder": 22,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "week": {
-                "type": "string",
-                "propertyOrder": 23,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "day_of_week": {
-                "type": "string",
-                "propertyOrder": 24,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "hour": {
-                "type": "string",
-                "propertyOrder": 25,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "minute": {
-                "type": "string",
-                "propertyOrder": 26,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "second": {
-                "type": "string",
-                "propertyOrder": 27,
-                "default": "*",
-                "options": {
-                    "dependencies": {
-                        "mode": "cron"
-                    }
-                }
-            },
-            "start_date": {
-                "type": "string",
-                "propertyOrder": 3,
-                "default": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "format": "datetime",
-                "options": {
-                    "dependencies": {
-                        "mode": ["interval","cron"]
-                    },
-                    "inputAttributes": {
-                        "class":  "date",
-                    }
-                }
-            },
-            "end_date": {
-                "type": "string",
-                "propertyOrder": 4,
-                "default": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "format": "datetime",
-                "options": {
-                    "dependencies": {
-                        "mode": ["interval","cron"]
-                    },
-                    "inputAttributes": {
-                        "class":  "date",
-                    }
-                }
-            },
-            "run_date": {
-                "type": "string",
-                "propertyOrder": 30,
-                "default": datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                "format": "datetime",
-                "options": {
-                    "dependencies": {
-                        "mode": "date"
-                    }
-                }
-            }
-        },
-        "defaultProperties": ["mode","weeks","days","minutes","seconds","start_date","end_date","year","month","day","week","day_of_week","hour","minute","second","timezone","date"]
-    }
+    scheduler_schema = get_schema()
     before_js = ""
-    # Pre-fill the date when changing the 'mode' in the JsonEditor
+    # Pre-fill the date when changing the 'trigger' in the JsonEditor
     after_js = (
         "function watchMode() {"
             "dt = new Date();"
@@ -219,7 +38,7 @@ class ScheduledOperationView(ModelView):
             "dt.getHours().toString().padStart(2, '0')}:${"
             "dt.getMinutes().toString().padStart(2, '0')}:${"
             "dt.getSeconds().toString().padStart(2, '0')}`;"
-            " newmode=this.getEditor('root.mode').getValue();"
+            " newmode=this.getEditor('root.trigger').getValue();"
             " default_value = {};"
             " switch(newmode) {"
             "  case 'interval': " 
@@ -234,10 +53,10 @@ class ScheduledOperationView(ModelView):
             " }"
             "current_value = this.getValue();"
             "current_value = Object.keys(current_value).forEach(key => current_value[key] === undefined && delete current_value[key]);"
-            "newval = {...default_value, ...current_value, mode:newmode};"
+            "newval = {...default_value, ...current_value, trigger:newmode};"
             "this.setValue(newval);"
         "}"
-        "editor.watch('root.mode',watchMode.bind(editor));"
+        "editor.watch('root.trigger',watchMode.bind(editor));"
     )
 
     edit_form_extra_fields = {
@@ -247,6 +66,51 @@ class ScheduledOperationView(ModelView):
         ),
     }
     add_form_extra_fields = edit_form_extra_fields
+
+    list_columns = ['operation_name','schedule_enabled']
+
+
+    def get_scheduler(self):
+        mgr = None
+        mgrs = self.appbuilder.addon_managers
+        if 'fab_addon_operation_scheduler.manager.OperationSchedulerManager' in mgrs:
+            mgr = mgrs['fab_addon_operation_scheduler.manager.OperationSchedulerManager']
+        #mgr = addon_instance
+        if mgr:
+            scheduler = mgr.scheduler
+            return scheduler
+        else:
+            return None
+
+    @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
+    def enableOperation(self, items):
+        scheduler = self.get_scheduler()
+        if scheduler:
+            for item in items:
+                item.activate(scheduler)
+            self.update_redirect()
+        return redirect(self.get_redirect())
+
+    @action("disableOperation","Disable tasks scheduling","Confirm deactivation of selected tasks ?","fa-rocket", single=False, multiple=True)
+    def disableOperation(self, items):
+        scheduler = self.get_scheduler()
+        if scheduler:
+            for item in items:
+                item.deactivate(scheduler)
+        self.update_redirect()
+        return redirect(self.get_redirect())
+
+    def __activate_operation_if_required(self, item):
+        if item.schedule_enabled == "Yes":
+            item.activate()
+        else:
+            item.deactivate()
+
+    def post_update(self, item):
+        self.__activate_operation_if_required(item)
+
+    def post_add(self, item):
+        self.__activate_operation_if_required(item)
 
 class SchedulableOperationView(ModelView):
     datamodel = SQLAInterface(SchedulableOperation)
