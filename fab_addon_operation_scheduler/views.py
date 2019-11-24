@@ -13,7 +13,9 @@ from fab_addon_turbowidgets.widgets import JsonEditorWidget
 
 from flask_appbuilder.actions import action
 
-#from .manager import addon_instance
+import logging
+
+log = logging.getLogger(__name__)
 
 """
     Create your Views (but don't register them here, do it on the manager::
@@ -72,18 +74,6 @@ class ScheduledOperationView(ModelView):
     list_columns = ['operation_name','schedule_enabled']
 
 
-#    def get_scheduler(self):
-#        mgr = None
-#        mgrs = self.appbuilder.addon_managers
-#        if 'fab_addon_operation_scheduler.manager.OperationSchedulerManager' in mgrs:
-#            mgr = mgrs['fab_addon_operation_scheduler.manager.OperationSchedulerManager']
-#        #mgr = addon_instance
-#        if mgr:
-#            scheduler = mgr.scheduler
-#            return scheduler
-#        else:
-#            return None
-
     @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def enableOperation(self, items):
         scheduler = AddonScheduler.get_scheduler()
@@ -104,12 +94,15 @@ class ScheduledOperationView(ModelView):
 
     def __activate_operation_if_required(self, item):
         if item.schedule_enabled == "Yes":
-            item.activate()
+            item.activate(AddonScheduler.get_scheduler())
         else:
-            item.deactivate()
+            item.deactivate(AddonScheduler.get_scheduler())
 
     def post_update(self, item):
         self.__activate_operation_if_required(item)
+
+    def process_form(self, form, is_created):
+        pass
 
     def post_add(self, item):
         self.__activate_operation_if_required(item)
