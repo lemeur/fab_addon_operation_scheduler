@@ -1,5 +1,22 @@
 from datetime import datetime
 
+def get_function_test_schema():
+    schema =  {
+        "type": "object",
+        "title": " ",
+        "properties": {
+            "arg1": {
+                "type": "string",
+                "propertyOrder": 1,
+            },
+            "arg2": {
+                "type": "integer",
+                "propertyOrder": 2,
+            }
+        }
+    }
+    return schema
+
 def get_schema():
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
