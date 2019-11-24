@@ -5,6 +5,8 @@ from .models import SchedulableOperation, ScheduledOperation
 from .schema import get_schema
 from wtforms import StringField, SelectField
 
+from .addon_scheduler import AddonScheduler
+
 from datetime import datetime
 
 from fab_addon_turbowidgets.widgets import JsonEditorWidget
@@ -70,21 +72,21 @@ class ScheduledOperationView(ModelView):
     list_columns = ['operation_name','schedule_enabled']
 
 
-    def get_scheduler(self):
-        mgr = None
-        mgrs = self.appbuilder.addon_managers
-        if 'fab_addon_operation_scheduler.manager.OperationSchedulerManager' in mgrs:
-            mgr = mgrs['fab_addon_operation_scheduler.manager.OperationSchedulerManager']
-        #mgr = addon_instance
-        if mgr:
-            scheduler = mgr.scheduler
-            return scheduler
-        else:
-            return None
+#    def get_scheduler(self):
+#        mgr = None
+#        mgrs = self.appbuilder.addon_managers
+#        if 'fab_addon_operation_scheduler.manager.OperationSchedulerManager' in mgrs:
+#            mgr = mgrs['fab_addon_operation_scheduler.manager.OperationSchedulerManager']
+#        #mgr = addon_instance
+#        if mgr:
+#            scheduler = mgr.scheduler
+#            return scheduler
+#        else:
+#            return None
 
     @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def enableOperation(self, items):
-        scheduler = self.get_scheduler()
+        scheduler = AddonScheduler.get_scheduler()
         if scheduler:
             for item in items:
                 item.activate(scheduler)
@@ -93,7 +95,7 @@ class ScheduledOperationView(ModelView):
 
     @action("disableOperation","Disable tasks scheduling","Confirm deactivation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def disableOperation(self, items):
-        scheduler = self.get_scheduler()
+        scheduler = AddonScheduler.get_scheduler()
         if scheduler:
             for item in items:
                 item.deactivate(scheduler)

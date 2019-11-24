@@ -2,16 +2,13 @@ import logging
 from flask_appbuilder.basemanager import BaseManager
 from flask_babel import lazy_gettext as _
 
-addon_instance = None
-
 from .views import ScheduledOperationView
 from .models import SchedulableOperation
+from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL
 
 #from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-from flask_apscheduler import APScheduler
-from apscheduler.schedulers.background import BackgroundScheduler
 
 from datetime import datetime
 
@@ -24,9 +21,6 @@ log = logging.getLogger(__name__)
    
 """
 
-
-SCHEDULER_TIMEZONE="Europe/Paris"
-SCHEDULER_SELFCHECK_INTERVAL=30
 
 class Config(object):
     JOBS = [
@@ -62,14 +56,9 @@ class OperationSchedulerManager(BaseManager):
         # Since the JobStore is not persistent we don't
         # have to empty the JobStore (MemoryJobStore)
 
-        # Define the new scheduler
-        log.debug("APScheduler: defining BackgroundScheduler")
-        bgsched = BackgroundScheduler(timezone=SCHEDULER_TIMEZONE, daemon=True)
-        scheduler = APScheduler(scheduler=bgsched)
-        scheduler.init_app(self.appbuilder.get_app)
-        self.scheduler = scheduler
+        # Define the new scheduler: a singleton
+        schedulerObj = AddonScheduler(appbuilder)
 
-        addon_instance = self
 
     @classmethod
     def set_last_check(cls, datestring):
@@ -92,18 +81,21 @@ class OperationSchedulerManager(BaseManager):
 
         # Run the scheduler
         log.debug("APScheduler: starting scheduler")
-        self.scheduler.start()
+        AddonScheduler.start()
 
-        #log.debug("APScheduler: adding selfcheck task")
-        selfcheck_job = self.scheduler.get_job('selfcheck')
+        log.debug("APScheduler: adding selfcheck task")
+        selfcheck_job = AddonScheduler.get_job('selfcheck')
         if selfcheck_job:
             selfcheck_job.remove()
-        self.scheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
+        AddonScheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
 
         # Reload ScheduledOperations
         # ==> This can't be done at this time
         # because functions may have not been registered yet.
         # ==> This will be done at registration time
+
+        addon_instance = self
+        log.debug("Registered addon_instance with:"+str(addon_instance))
 
 def scheduler_selfcheck():
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")

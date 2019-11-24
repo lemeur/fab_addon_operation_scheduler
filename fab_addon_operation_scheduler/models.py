@@ -5,9 +5,12 @@ from flask_appbuilder.models.mixins import AuditMixin, FileColumn, ImageColumn
 from sqlalchemy import Column, Integer, String, ForeignKey, Date, Enum
 from sqlalchemy.orm import relationship
 
+from .addon_scheduler import AddonScheduler
+
 import logging
 
 log = logging.getLogger(__name__)
+
 
 
 class ListOfOperations:
@@ -23,8 +26,8 @@ class ListOfOperations:
 
         jobs_to_activate = db.session.query(ScheduledOperation).filter(ScheduledOperation.schedule_enabled == "Yes").filter(ScheduledOperation.operation_name == name).all()
         for j in jobs_to_activate:
-            log.debug('APScheduler activating job "{}" for function "{}":'.format(str(j.id), name))
-            #j.activate(addon_instance.scheduler)
+            log.debug('APScheduler activating job "{}" for function "{}":'.format(str(j.id)+"-"+j.operation_name, name))
+            j.activate(AddonScheduler.get_scheduler())
 
     @classmethod
     def get_all(cls):
@@ -71,10 +74,10 @@ class ScheduledOperation(Model):
         if 'end_date' in taskSchedulerArgs and taskSchedulerArgs['end_date'] == "":
             del taskSchedulerArgs['end_date']
         if oper:
-            current_job = scheduler.get_job(str(self.id))
+            current_job = scheduler.get_job(str(self.id)+'-'+self.operation_name)
             if current_job:
                 current_job.remove()
-            scheduler.add_job(str(self.id), oper['function'], **taskSchedulerArgs, max_instances=6)
+            scheduler.add_job(str(self.id)+'-'+self.operation_name, oper['function'], **taskSchedulerArgs, max_instances=6)
         else:
             log.debug("APScheduler can't find oper for:"+self.operation_name)
 
@@ -85,7 +88,7 @@ class ScheduledOperation(Model):
         oper = ListOfOperations.get_one(self.operation_name)
         taskSchedulerArgs = json.loads(self.scheduler_args)
         if oper:
-            current_job = scheduler.get_job(str(self.id))
+            current_job = scheduler.get_job(str(self.id)+'-'+self.operation_name)
             if current_job:
                 current_job.remove()
         log.debug("APScheduler jobs after REMOVE:"+str([k.id for k in scheduler.get_jobs()]))
