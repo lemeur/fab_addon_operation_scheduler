@@ -17,7 +17,7 @@ def get_function_test_schema():
     }
     return schema
 
-def get_schema():
+def get_scheduler_schema():
     now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 
     scheduler_schema = {

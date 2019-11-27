@@ -2,7 +2,7 @@ from flask import render_template, redirect
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
 from .models import SchedulableOperation, ScheduledOperation
-from .schema import get_schema, get_function_test_schema
+from .schema import get_scheduler_schema, get_function_test_schema
 from wtforms import StringField, SelectField
 
 from .addon_scheduler import AddonScheduler
@@ -29,8 +29,8 @@ log = logging.getLogger(__name__)
 
 class ScheduledOperationView(ModelView):
     datamodel = SQLAInterface(ScheduledOperation)
-    scheduler_schema = get_schema()
-    function_test_schema = get_function_test_schema()
+    #scheduler_schema = get_scheduler_schema()
+    #function_test_schema = get_function_test_schema()
     before_js = ""
     # Pre-fill the date when changing the 'trigger' in the JsonEditor
     after_js = (
@@ -61,7 +61,7 @@ class ScheduledOperationView(ModelView):
             "newval = {...default_value, ...current_value, trigger:newmode};"
             "this.setValue(newval);"
         "}"
-        "editor_scheduler_arg.watch('root.trigger',watchMode.bind(editor));"
+        "editor_scheduler_args.watch('root.trigger',watchMode.bind(editor_scheduler_args));"
     )
 
     before_js2 = ""
@@ -69,11 +69,12 @@ class ScheduledOperationView(ModelView):
     edit_form_extra_fields = {
         "scheduler_args": StringField(
             "Scheduler",
-            widget=JsonEditorWidget(scheduler_schema, before_js, after_js),
+            #widget=JsonEditorWidget(scheduler_schema, before_js, after_js),
+            widget=JsonEditorWidget(get_scheduler_schema, before_js, after_js),
         ),
         "operation_args": StringField(
             "OperationArgs",
-            widget=JsonEditorWidget(function_test_schema, before_js2, after_js2),
+            widget=JsonEditorWidget(get_function_test_schema, before_js2, after_js2),
         ),
     }
     add_form_extra_fields = edit_form_extra_fields
