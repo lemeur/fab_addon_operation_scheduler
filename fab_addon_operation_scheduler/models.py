@@ -66,7 +66,6 @@ class ScheduledOperation(Model):
         return "{} {}({})".format(self.operation_name, self.scheduler_trigger, self.scheduler_args)
 
     def activate(self, scheduler):
-        self.schedule_enabled = "Yes"
         oper = ListOfOperations.get_one(self.operation_name)
         taskSchedulerArgs = json.loads(self.scheduler_args)
         if 'start_date' in taskSchedulerArgs and taskSchedulerArgs['start_date'] == "":
@@ -84,7 +83,6 @@ class ScheduledOperation(Model):
         log.debug("APScheduler jobs after ADD:"+str([k.id for k in scheduler.get_jobs()]))
 
     def deactivate(self, scheduler):
-        self.schedule_enabled = "No"
         oper = ListOfOperations.get_one(self.operation_name)
         taskSchedulerArgs = json.loads(self.scheduler_args)
         if oper:

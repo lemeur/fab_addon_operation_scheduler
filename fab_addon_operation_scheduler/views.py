@@ -69,7 +69,6 @@ class ScheduledOperationView(ModelView):
     edit_form_extra_fields = {
         "scheduler_args": StringField(
             "Scheduler",
-            #widget=JsonEditorWidget(scheduler_schema, before_js, after_js),
             widget=JsonEditorWidget(get_scheduler_schema, before_js, after_js),
         ),
         "operation_args": StringField(
@@ -87,6 +86,8 @@ class ScheduledOperationView(ModelView):
         scheduler = AddonScheduler.get_scheduler()
         if scheduler:
             for item in items:
+                item.schedule_enabled = "Yes"
+                self.datamodel.edit(item)
                 item.activate(scheduler)
             self.update_redirect()
         return redirect(self.get_redirect())
@@ -96,6 +97,8 @@ class ScheduledOperationView(ModelView):
         scheduler = AddonScheduler.get_scheduler()
         if scheduler:
             for item in items:
+                item.schedule_enabled = "No"
+                self.datamodel.edit(item)
                 item.deactivate(scheduler)
         self.update_redirect()
         return redirect(self.get_redirect())
