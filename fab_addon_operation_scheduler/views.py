@@ -1,7 +1,7 @@
 from flask import render_template, redirect
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
-from .models import SchedulableOperation, ScheduledOperation
+from .models import SchedulableOperation, ScheduledOperation, ListOfOperations
 from .schema import get_scheduler_schema, get_function_test_schema
 from wtforms import StringField, SelectField
 
@@ -14,6 +14,7 @@ from fab_addon_turbowidgets.widgets import JsonEditorWidget
 from flask_appbuilder.actions import action
 
 import logging
+import json
 
 log = logging.getLogger(__name__)
 
@@ -27,10 +28,14 @@ log = logging.getLogger(__name__)
     
 """
 
+
+def get_operation_args_schema_js():
+    list_oper_schema_json = json.dumps(ListOfOperations.get_dict())
+    before_js2 = "list_operations_schema = JSON.parse('{}')".format(list_oper_schema_json)
+    return before_js2
+
 class ScheduledOperationView(ModelView):
     datamodel = SQLAInterface(ScheduledOperation)
-    #scheduler_schema = get_scheduler_schema()
-    #function_test_schema = get_function_test_schema()
     before_js = ""
     # Pre-fill the date when changing the 'trigger' in the JsonEditor
     after_js = (
@@ -64,7 +69,6 @@ class ScheduledOperationView(ModelView):
         "editor_scheduler_args.watch('root.trigger',watchMode.bind(editor_scheduler_args));"
     )
 
-    before_js2 = ""
     after_js2 = ""
     edit_form_extra_fields = {
         "scheduler_args": StringField(
@@ -73,7 +77,7 @@ class ScheduledOperationView(ModelView):
         ),
         "operation_args": StringField(
             "OperationArgs",
-            widget=JsonEditorWidget(get_function_test_schema, before_js2, after_js2),
+            widget=JsonEditorWidget(get_function_test_schema, get_operation_args_schema_js, after_js2, master_id="operation", extra_classes="fab_addon_operation_manager_opargs"),
         ),
     }
     add_form_extra_fields = edit_form_extra_fields
@@ -108,6 +112,9 @@ class ScheduledOperationView(ModelView):
             item.activate(AddonScheduler.get_scheduler())
         else:
             item.deactivate(AddonScheduler.get_scheduler())
+
+    def prefill_form(self, form, pk):
+        pass
 
     def post_update(self, item):
         self.__activate_operation_if_required(item)

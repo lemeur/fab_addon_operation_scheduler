@@ -1,6 +1,7 @@
 import logging
 from flask_appbuilder.basemanager import BaseManager
 from flask_babel import lazy_gettext as _
+from flask import Blueprint, url_for
 
 from .views import ScheduledOperationView
 from .models import SchedulableOperation
@@ -44,6 +45,12 @@ class OperationSchedulerManager(BaseManager):
         super(OperationSchedulerManager, self).__init__(appbuilder)
         self.appbuilder.get_app.config.from_object(Config())
 
+        self.static_bp = Blueprint('fab_addon_operation_scheduler', __name__,
+                                   url_prefix='/fab_addon_operation_scheduler',
+                                   static_folder='static/fab_addon_operation_scheduler')
+        self.addon_js = [('fab_addon_operation_scheduler.static', 'js/main.js')]
+        self.addon_css = []
+
         # Delete all SchedulableOperation at startup, 
         # they will be registered programmatically by calling
         # ListOfOperations.register_operation()
@@ -75,7 +82,8 @@ class OperationSchedulerManager(BaseManager):
         self.appbuilder.add_view(ScheduledOperationView, "Schedulable_Operations",icon = "fa-user",category = "Scheduler")
 
     def pre_process(self):
-        pass
+        log.info("Adding static blueprint for fab_addon_operation_scheduler.")
+        self.appbuilder.get_app.register_blueprint(self.static_bp)
 
     def post_process(self):
 

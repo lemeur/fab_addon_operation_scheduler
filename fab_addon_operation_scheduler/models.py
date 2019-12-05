@@ -40,6 +40,12 @@ class ListOfOperations:
         else:
             return None
 
+    @classmethod
+    def get_dict(cls):
+        res = {k:cls.members[k]['args_schema'] for k in cls.members}
+        return res
+            
+
 
 class SchedulableOperation(Model):
     oper_name = Column(String(50), primary_key=True)

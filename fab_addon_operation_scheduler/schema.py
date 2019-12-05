@@ -1,6 +1,7 @@
 from datetime import datetime
 
 def get_function_test_schema():
+    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     schema =  {
         "type": "object",
         "title": " ",
@@ -8,6 +9,7 @@ def get_function_test_schema():
             "arg1": {
                 "type": "string",
                 "propertyOrder": 1,
+                "default": now
             },
             "arg2": {
                 "type": "integer",
