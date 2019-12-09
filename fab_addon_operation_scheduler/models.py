@@ -74,6 +74,7 @@ class ScheduledOperation(Model):
     def activate(self, scheduler):
         oper = ListOfOperations.get_one(self.operation_name)
         taskSchedulerArgs = json.loads(self.scheduler_args)
+        operation_args_dict = json.loads(self.operation_args)
         if 'start_date' in taskSchedulerArgs and taskSchedulerArgs['start_date'] == "":
             del taskSchedulerArgs['start_date']
         if 'end_date' in taskSchedulerArgs and taskSchedulerArgs['end_date'] == "":
@@ -82,7 +83,7 @@ class ScheduledOperation(Model):
             current_job = scheduler.get_job(str(self.id)+'-'+self.operation_name)
             if current_job:
                 current_job.remove()
-            scheduler.add_job(str(self.id)+'-'+self.operation_name, oper['function'], **taskSchedulerArgs, max_instances=6)
+            scheduler.add_job(str(self.id)+'-'+self.operation_name, oper['function'], **taskSchedulerArgs, max_instances=6, kwargs=operation_args_dict)
         else:
             log.debug("APScheduler can't find oper for:"+self.operation_name)
 
