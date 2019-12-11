@@ -67,14 +67,22 @@ class ScheduledOperation(Model):
     operation_args = Column(String(200), nullable=True)
     scheduler_args = Column(String(200), nullable=True)
     schedule_enabled = Column(Enum('Yes','No'), unique=False, nullable=False, default='No')
+    status = Column(String(200), default="Unregistered")
 
     def __repr__(self):
-        return "{} {}({})".format(self.operation_name, self.scheduler_trigger, self.scheduler_args)
+        trigger = "Unknown"
+        try:
+            scheduler_args_dict = json.loads(self.scheduler_args)
+            trigger = scheduler_args_dict['trigger']
+        except:
+            pass
+
+        return "{} {}({})".format(self.operation_name, trigger, self.scheduler_args)
 
     def activate(self, scheduler):
         oper = ListOfOperations.get_one(self.operation_name)
         taskSchedulerArgs = json.loads(self.scheduler_args)
-        operation_args_dict = json.loads(self.operation_args)
+
         if 'start_date' in taskSchedulerArgs and taskSchedulerArgs['start_date'] == "":
             del taskSchedulerArgs['start_date']
         if 'end_date' in taskSchedulerArgs and taskSchedulerArgs['end_date'] == "":
@@ -83,7 +91,16 @@ class ScheduledOperation(Model):
             current_job = scheduler.get_job(str(self.id)+'-'+self.operation_name)
             if current_job:
                 current_job.remove()
-            scheduler.add_job(str(self.id)+'-'+self.operation_name, oper['function'], **taskSchedulerArgs, max_instances=6, kwargs=operation_args_dict)
+            if self.operation_args:
+                operation_args_dict = json.loads(self.operation_args)
+                try:
+                    scheduler.add_job(str(self.id)+'-'+self.operation_name, oper['function'], **taskSchedulerArgs, max_instances=6, kwargs=operation_args_dict)
+                    self.status="Registered"
+                except Exception as e:
+                    log.error("Error activating '{}' with error '{}'".format(self.operation_name, e))
+                    self.status="Error '{}'".format(self.operation_name, e)
+            else:
+                scheduler.add_job(str(self.id)+'-'+self.operation_name, oper['function'], **taskSchedulerArgs, max_instances=6)
         else:
             log.debug("APScheduler can't find oper for:"+self.operation_name)
 

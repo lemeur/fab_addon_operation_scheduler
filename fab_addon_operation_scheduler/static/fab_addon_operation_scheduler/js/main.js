@@ -10,7 +10,14 @@ function loadJsonEditorSlaves(elem) {
                 // master_schema might be undefined if there is no selected value
                 if (master_schema !== undefined && Object.keys(master_schema).length != 0) {
                     //console.log(JSON.stringify(master_schema))
-                    listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")
+                    //listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")
+                    starting_value = $('#operation_args').attr('value')
+                    if (starting_value != "") {
+                        listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),starting_value,"{}")
+                    }
+                    else {
+                        listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")
+                    }
                 }
         }
         else {
@@ -21,6 +28,8 @@ function loadJsonEditorSlaves(elem) {
                 master_schema = list_operations_schema[e.val]
                 theEditor = listOfJsonEditors['operation_args']
                 theEditor.destroy();
+                starting_value = $('#operation_args').attr({value: ""})
+                $('#operation_args').val('')
                 if (master_schema !== undefined &&  Object.keys(master_schema).length != 0) {
                     //console.log(JSON.stringify(master_schema))
                     listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")

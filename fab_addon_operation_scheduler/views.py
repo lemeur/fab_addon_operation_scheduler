@@ -2,7 +2,7 @@ from flask import render_template, redirect
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
 from .models import SchedulableOperation, ScheduledOperation, ListOfOperations
-from .schema import get_scheduler_schema, get_function_test_schema
+from .schema import get_scheduler_schema
 from wtforms import StringField, SelectField
 
 from .addon_scheduler import AddonScheduler
@@ -67,6 +67,8 @@ class ScheduledOperationView(ModelView):
             "this.setValue(newval);"
         "}"
         "editor_scheduler_args.watch('root.trigger',watchMode.bind(editor_scheduler_args));"
+        "editor_scheduler_args_init = watchMode.bind(editor_scheduler_args);"
+        "editor_scheduler_args_init();"
     )
 
     after_js2 = ""
@@ -77,12 +79,12 @@ class ScheduledOperationView(ModelView):
         ),
         "operation_args": StringField(
             "OperationArgs",
-            widget=JsonEditorWidget(get_function_test_schema, get_operation_args_schema_js, after_js2, master_id="operation", extra_classes="fab_addon_operation_manager_opargs"),
+            widget=JsonEditorWidget("{}", before_js=get_operation_args_schema_js, after_js=after_js2, master_id="operation", extra_classes="fab_addon_operation_manager_opargs"),
         ),
     }
     add_form_extra_fields = edit_form_extra_fields
 
-    list_columns = ['operation_name','schedule_enabled']
+    list_columns = ['operation_name','schedule_enabled','status']
 
 
     @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
@@ -108,9 +110,15 @@ class ScheduledOperationView(ModelView):
         return redirect(self.get_redirect())
 
     def __activate_operation_if_required(self, item):
+        try:
+            print(item)
+        except Exception as e:
+            print(e)
         if item.schedule_enabled == "Yes":
+            log.debug("Must activate {}".format(item))
             item.activate(AddonScheduler.get_scheduler())
         else:
+            log.debug("Must DE-activate {}".format(item))
             item.deactivate(AddonScheduler.get_scheduler())
 
     def prefill_form(self, form, pk):
