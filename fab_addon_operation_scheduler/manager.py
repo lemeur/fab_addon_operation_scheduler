@@ -3,7 +3,7 @@ from flask_appbuilder.basemanager import BaseManager
 from flask_babel import lazy_gettext as _
 from flask import Blueprint, url_for
 
-from .views import ScheduledOperationView
+from .views import ScheduledOperationView, SchedulerManagerView
 from .models import SchedulableOperation
 from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL
 
@@ -47,6 +47,7 @@ class OperationSchedulerManager(BaseManager):
 
         self.static_bp = Blueprint('fab_addon_operation_scheduler', __name__,
                                    url_prefix='/fab_addon_operation_scheduler',
+                                   template_folder='templates/fab_addon_operation_scheduler',
                                    static_folder='static/fab_addon_operation_scheduler')
         self.addon_js = [('fab_addon_operation_scheduler.static', 'js/main.js')]
         self.addon_css = []
@@ -79,6 +80,7 @@ class OperationSchedulerManager(BaseManager):
         """
             This method is called by AppBuilder when initializing, use it to add you views
         """
+        self.appbuilder.add_view(SchedulerManagerView, "Schedulers",icon = "fa-user",category = "Scheduler")
         self.appbuilder.add_view(ScheduledOperationView, "Schedulable_Operations",icon = "fa-user",category = "Scheduler")
 
     def pre_process(self):

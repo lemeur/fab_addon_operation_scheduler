@@ -5,6 +5,8 @@ from .models import SchedulableOperation, ScheduledOperation, ListOfOperations
 from .schema import get_scheduler_schema
 from wtforms import StringField, SelectField
 
+from flask_appbuilder.baseviews import BaseView, expose
+
 from .addon_scheduler import AddonScheduler
 
 from datetime import datetime
@@ -136,4 +138,26 @@ class ScheduledOperationView(ModelView):
 class SchedulableOperationView(ModelView):
     datamodel = SQLAInterface(SchedulableOperation)
     related_views = [ScheduledOperationView]
+
+
+class SchedulerManagerView(BaseView):
+    route_base = "/fab_addon_opseched_schedulermanager"
+    default_view = 'manager'
+
+    @expose("/manager/")
+    def manager(self):
+        scheduler = AddonScheduler.get_scheduler()
+        state_to_string =  ["STATE_STOPPED ", "STATE_RUNNING","STATE_PAUSED"]
+        state = scheduler.state
+        jobs=scheduler.get_jobs()
+        jobs_str = scheduler.scheduler.print_jobs()
+        schedulers_info = [
+            {
+                'scheduler_name': 'default_scheduler',
+                'scheduler_state': state_to_string[state],
+                'scheduler_jobs': jobs_str
+            }
+        ]
+        #return self.render_template("fab_addon_operation_scheduler/operation_scheduler_management.html", schedulers=schedulers_info)
+        return self.render_template("operation_scheduler_management.html", schedulers=schedulers_info)
 

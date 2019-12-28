@@ -3,3 +3,4 @@ include README.md
 prune *.pyc
 recursive-include fab_addon_operation_scheduler/static *
 recursive-include fab_addon_operation_scheduler/translations *
+recursive-include fab_addon_operation_scheduler/templates *
