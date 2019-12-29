@@ -1,15 +1,16 @@
-from flask import render_template, redirect
+from flask import render_template, redirect, url_for
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
 from .models import SchedulableOperation, ScheduledOperation, ListOfOperations
 from .schema import get_scheduler_schema
 from wtforms import StringField, SelectField
 
-from flask_appbuilder.baseviews import BaseView, expose
+from flask_appbuilder import BaseView, expose, has_access
 
-from .addon_scheduler import AddonScheduler
+from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL, scheduler_selfcheck
 
 from datetime import datetime
+import pytz
 
 from fab_addon_turbowidgets.widgets import JsonEditorWidget
 
@@ -17,6 +18,8 @@ from flask_appbuilder.actions import action
 
 import logging
 import json
+
+utc=pytz.UTC
 
 log = logging.getLogger(__name__)
 
@@ -143,21 +146,72 @@ class SchedulableOperationView(ModelView):
 class SchedulerManagerView(BaseView):
     route_base = "/fab_addon_opseched_schedulermanager"
     default_view = 'manager'
+    state_to_string =  ["STATE_STOPPED", "STATE_RUNNING","STATE_PAUSED"]
 
     @expose("/manager/")
+    @has_access
     def manager(self):
         scheduler = AddonScheduler.get_scheduler()
-        state_to_string =  ["STATE_STOPPED ", "STATE_RUNNING","STATE_PAUSED"]
         state = scheduler.state
         jobs=scheduler.get_jobs()
-        jobs_str = scheduler.scheduler.print_jobs()
+        #scheduler.scheduler.print_jobs()
+        jobs_str=""
+        jobs_info = []
+        for job in jobs:
+            #trig = job.trigger
+            #trig_next_date = trig.get_next_fire_time(None, datetime.now(utc)).strftime("%Y-%m-%d %H:%M:%S")
+            trig_next_date = job.next_run_time.strftime("%Y-%m-%d %H:%M:%S")
+            jobs_str += "{} (next at {}),".format(job.name,trig_next_date)
+            jobs_info.append({
+                'job_name':job.name,
+                'job_next_start': trig_next_date
+            })
+            
         schedulers_info = [
             {
                 'scheduler_name': 'default_scheduler',
-                'scheduler_state': state_to_string[state],
+                'scheduler_state': self.state_to_string[state],
                 'scheduler_jobs': jobs_str
             }
         ]
         #return self.render_template("fab_addon_operation_scheduler/operation_scheduler_management.html", schedulers=schedulers_info)
-        return self.render_template("operation_scheduler_management.html", schedulers=schedulers_info)
+        return self.render_template("operation_scheduler_management.html", scheduler_status= self.state_to_string[state], scheduler_jobs=jobs_info)
 
+    @expose("/pause/")
+    @has_access
+    def pause(self):
+        scheduler = AddonScheduler.get_scheduler()
+        scheduler.pause()
+        return redirect(url_for('SchedulerManagerView.manager'))
+        return redirect(self.get_redirect())
+
+    @expose("/resume/")
+    @has_access
+    def resume(self):
+        scheduler = AddonScheduler.get_scheduler()
+        scheduler.resume()
+        return redirect(url_for('SchedulerManagerView.manager'))
+        return redirect(self.get_redirect())
+
+    @expose("/shutdown/")
+    @has_access
+    def shutdown(self):
+        scheduler = AddonScheduler.get_scheduler()
+        if scheduler.running:
+            scheduler.shutdown()
+        return redirect(url_for('SchedulerManagerView.manager'))
+
+    @expose("/start/")
+    @has_access
+    def start(self):
+        scheduler = AddonScheduler.get_scheduler()
+        if self.state_to_string[scheduler.state] == "STATE_STOPPED":
+            scheduler.start(paused=False)
+        log.debug("APScheduler: adding selfcheck task")
+        selfcheck_job = AddonScheduler.get_job('selfcheck')
+        if selfcheck_job:
+            selfcheck_job.remove()
+        AddonScheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
+        db = ListOfOperations.db
+        ListOfOperations.reschedule_operations(db)
+        return redirect(url_for('SchedulerManagerView.manager'))

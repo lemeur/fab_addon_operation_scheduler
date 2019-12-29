@@ -5,7 +5,7 @@ from flask import Blueprint, url_for
 
 from .views import ScheduledOperationView, SchedulerManagerView
 from .models import SchedulableOperation
-from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL
+from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL, scheduler_selfcheck
 
 #from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.jobstores.memory import MemoryJobStore
@@ -107,8 +107,8 @@ class OperationSchedulerManager(BaseManager):
         addon_instance = self
         log.debug("Registered addon_instance with:"+str(addon_instance))
 
-def scheduler_selfcheck():
-    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    OperationSchedulerManager.set_last_check(now)
-    log.debug("fab_addon_operation_scheduler selfcheck:{}".format(now))
+#def scheduler_selfcheck():
+#    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+#    OperationSchedulerManager.set_last_check(now)
+#    log.debug("fab_addon_operation_scheduler selfcheck:{}".format(now))
 

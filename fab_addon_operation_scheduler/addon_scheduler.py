@@ -7,6 +7,11 @@ log = logging.getLogger(__name__)
 SCHEDULER_TIMEZONE="Europe/Paris"
 SCHEDULER_SELFCHECK_INTERVAL=30
 
+def scheduler_selfcheck():
+    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    OperationSchedulerManager.set_last_check(now)
+    log.debug("fab_addon_operation_scheduler selfcheck:{}".format(now))
+
 class AddonScheduler(object):
     __instance = None
 

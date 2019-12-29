@@ -15,12 +15,14 @@ log = logging.getLogger(__name__)
 
 class ListOfOperations:
     members = dict()
+    db = None
 
     @classmethod
     def register_operation(cls, db, name, description, func, args_schema={}):
         log.debug('APScheduler registering new function:'+name)
         cls.members[name]={'name': name, 'description': description, 'function': func, 'args_schema': args_schema}
         schedop = SchedulableOperation(name, description, json.dumps(args_schema))
+        cls.db= db
         db.session.add(schedop)
         db.session.commit()
 
@@ -28,6 +30,13 @@ class ListOfOperations:
         for j in jobs_to_activate:
             log.debug('APScheduler activating job "{}" for function "{}":'.format(str(j.id)+"-"+j.operation_name, name))
             j.activate(AddonScheduler.get_scheduler())
+
+    @classmethod
+    def reschedule_operations(cls, db):
+        jobs_to_activate = db.session.query(ScheduledOperation).filter(ScheduledOperation.schedule_enabled == "Yes").all()
+        for j in jobs_to_activate:
+            if j.operation_name in cls.members:
+                j.activate(AddonScheduler.get_scheduler())
 
     @classmethod
     def get_all(cls):

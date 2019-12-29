@@ -1,4 +1,5 @@
 {% extends "appbuilder/base.html" %}
+{% import 'appbuilder/general/lib.html' as lib %}
 
 {% block head_css %}
     {{ super() }}
@@ -9,17 +10,34 @@
 {% endblock %}
 
 {% block content %}
-    {% for scheduler in schedulers %}
-    <div class="schedop_container">
-        <div class="schedop_schedulers">
-            {{scheduler.scheduler_name}}
-            {{scheduler.scheduler_state}}
-        </div>
-        <div class="schedop_operations">
-            {{ scheduler.scheduler_jobs  }}
-        </div>
-    </div>
+    <table class="table table-bordered table-hover">
+        <tbody>
+            <tr>
+                <td>Scheduler Status</td>
+                <td>{{scheduler_status}}</td>
+                <td><a href="{{url_for('SchedulerManagerView.pause')}}">pause</a></td>
+                <td><a href="{{url_for('SchedulerManagerView.resume')}}">resume</a></td>
+                <td><a href="{{url_for('SchedulerManagerView.shutdown')}}">shutdown</a></td>
+                <td><a href="{{url_for('SchedulerManagerView.start')}}">start</a></td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-bordered table-hover">
+        <thead>
+            <th>Job Name</th>
+            <th>Next run</th>
+        </thead>
+        <tbody>
+    {% for job in scheduler_jobs %}
+        <tr>
+            <td>{{ job.job_name }}</td>
+            <td>{{ job.job_next_start }}</td>
+        </tr>
     {% endfor %}
+        </tbody>
+    </table>
+
+{{ lib.lnk_back() }}
 {% endblock %}
 
 {% block tail_js %}
