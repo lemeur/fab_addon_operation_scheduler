@@ -1,6 +1,7 @@
 # fab_addon_operation_scheduler
 An Flask-Appbuilder scheduler (based on flask-AppScheduler), with graphical UI to schedule tasks
 
+Status: work in progress
 ## requirements
 
 This is a plugin for Flask-Appbuilder and must be:
