@@ -11,7 +11,7 @@ from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFC
 from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 
-from datetime import datetime
+from multiprocessing import Value
 
 log = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class Config(object):
 
     SCHEDULER_JOBSTORES = {
 #        'default': SQLAlchemyJobStore(url='sqlite:///fab_addon_operation_scheduler.db')
-         'default': MemoryJobStore()
+        'default': MemoryJobStore()
     }
 
     SCHEDULER_API_ENABLED = True
@@ -43,7 +43,8 @@ class OperationSchedulerManager(BaseManager):
              Use the constructor to setup any config keys specific for your app. 
         """
         super(OperationSchedulerManager, self).__init__(appbuilder)
-        self.appbuilder.get_app.config.from_object(Config())
+        app = self.appbuilder.get_app
+        app.config.from_object(Config())
 
         self.static_bp = Blueprint('fab_addon_operation_scheduler', __name__,
                                    url_prefix='/fab_addon_operation_scheduler',
@@ -65,8 +66,8 @@ class OperationSchedulerManager(BaseManager):
         # have to empty the JobStore (MemoryJobStore)
 
         # Define the new scheduler: a singleton
+        appbuilder.fab_addon_operation_scheduler_started = Value('b', False)
         schedulerObj = AddonScheduler(appbuilder)
-
 
     @classmethod
     def set_last_check(cls, datestring):
@@ -106,9 +107,4 @@ class OperationSchedulerManager(BaseManager):
 
         addon_instance = self
         log.debug("Registered addon_instance with:"+str(addon_instance))
-
-#def scheduler_selfcheck():
-#    now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-#    OperationSchedulerManager.set_last_check(now)
-#    log.debug("fab_addon_operation_scheduler selfcheck:{}".format(now))
 

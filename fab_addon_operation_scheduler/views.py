@@ -181,6 +181,7 @@ class SchedulerManagerView(BaseView):
     @has_access
     def pause(self):
         scheduler = AddonScheduler.get_scheduler()
+        #AddonScheduler.remove_all_jobs()
         scheduler.pause()
         return redirect(url_for('SchedulerManagerView.manager'))
         return redirect(self.get_redirect())
@@ -197,6 +198,7 @@ class SchedulerManagerView(BaseView):
     @has_access
     def shutdown(self):
         scheduler = AddonScheduler.get_scheduler()
+        #AddonScheduler.remove_all_jobs()
         if scheduler.running:
             scheduler.shutdown()
         return redirect(url_for('SchedulerManagerView.manager'))
