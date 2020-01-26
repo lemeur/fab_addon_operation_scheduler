@@ -1,7 +1,7 @@
 from flask import render_template, redirect, url_for
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder import ModelView
-from .models import SchedulableOperation, ScheduledOperation, ListOfOperations
+from .models import ScheduledOperation
 from .schema import get_scheduler_schema
 from wtforms import StringField, SelectField
 
@@ -35,7 +35,8 @@ log = logging.getLogger(__name__)
 
 
 def get_operation_args_schema_js():
-    list_oper_schema_json = json.dumps(ListOfOperations.get_dict())
+    addon_scheduler = AddonScheduler()
+    list_oper_schema_json = json.dumps(addon_scheduler.get_operations_args_schemas())
     before_js2 = "list_operations_schema = JSON.parse('{}')".format(list_oper_schema_json)
     return before_js2
 
@@ -86,15 +87,22 @@ class ScheduledOperationView(ModelView):
             "OperationArgs",
             widget=JsonEditorWidget("{}", before_js=get_operation_args_schema_js, after_js=after_js2, master_id="operation", extra_classes="fab_addon_operation_manager_opargs"),
         ),
+        "operation": SelectField(
+            choices=[ (k,k) for k in AddonScheduler().get_job_ids()]
+        )
     }
     add_form_extra_fields = edit_form_extra_fields
 
     list_columns = ['operation_name','schedule_enabled','status']
 
+    def prefill_form(form, pk):
+        print("TIBO TIBO")
+        form.operation.choices = ['a','b']
 
     @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def enableOperation(self, items):
-        scheduler = AddonScheduler.get_scheduler()
+        #scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
         if scheduler:
             for item in items:
                 item.schedule_enabled = "Yes"
@@ -105,7 +113,8 @@ class ScheduledOperationView(ModelView):
 
     @action("disableOperation","Disable tasks scheduling","Confirm deactivation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def disableOperation(self, items):
-        scheduler = AddonScheduler.get_scheduler()
+        #scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
         if scheduler:
             for item in items:
                 item.schedule_enabled = "No"
@@ -116,15 +125,17 @@ class ScheduledOperationView(ModelView):
 
     def __activate_operation_if_required(self, item):
         try:
-            print(item)
+            log.debug("__activate_operation_if_required, item={}".format(repr(item)))
         except Exception as e:
-            print(e)
+            log.debug("ERROR __activate_operation_if_required, item={} error={}".format(repr(item),repr(e)))
         if item.schedule_enabled == "Yes":
             log.debug("Must activate {}".format(item))
-            item.activate(AddonScheduler.get_scheduler())
+            scheduler = AddonScheduler()
+            item.activate(scheduler)
         else:
             log.debug("Must DE-activate {}".format(item))
-            item.deactivate(AddonScheduler.get_scheduler())
+            scheduler = AddonScheduler()
+            item.deactivate(scheduler)
 
     def prefill_form(self, form, pk):
         pass
@@ -138,9 +149,9 @@ class ScheduledOperationView(ModelView):
     def post_add(self, item):
         self.__activate_operation_if_required(item)
 
-class SchedulableOperationView(ModelView):
-    datamodel = SQLAInterface(SchedulableOperation)
-    related_views = [ScheduledOperationView]
+#class SchedulableOperationView(ModelView):
+#    datamodel = SQLAInterface(SchedulableOperation)
+#    related_views = [ScheduledOperationView]
 
 
 class SchedulerManagerView(BaseView):
@@ -151,10 +162,11 @@ class SchedulerManagerView(BaseView):
     @expose("/manager/")
     @has_access
     def manager(self):
-        scheduler = AddonScheduler.get_scheduler()
-        state = scheduler.state
+        #scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
+        state = scheduler.get_state()
+        state_str = scheduler.get_state_str()
         jobs=scheduler.get_jobs()
-        #scheduler.scheduler.print_jobs()
         jobs_str=""
         jobs_info = []
         for job in jobs:
@@ -170,7 +182,7 @@ class SchedulerManagerView(BaseView):
         schedulers_info = [
             {
                 'scheduler_name': 'default_scheduler',
-                'scheduler_state': self.state_to_string[state],
+                'scheduler_state': state_str,
                 'scheduler_jobs': jobs_str
             }
         ]
@@ -180,24 +192,27 @@ class SchedulerManagerView(BaseView):
     @expose("/pause/")
     @has_access
     def pause(self):
-        scheduler = AddonScheduler.get_scheduler()
+        #scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
         #AddonScheduler.remove_all_jobs()
         scheduler.pause()
         return redirect(url_for('SchedulerManagerView.manager'))
-        return redirect(self.get_redirect())
+        #return redirect(self.get_redirect())
 
     @expose("/resume/")
     @has_access
     def resume(self):
-        scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
+        #scheduler = AddonScheduler.get_scheduler()
         scheduler.resume()
         return redirect(url_for('SchedulerManagerView.manager'))
-        return redirect(self.get_redirect())
+        #return redirect(self.get_redirect())
 
     @expose("/shutdown/")
     @has_access
     def shutdown(self):
-        scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
+        #scheduler = AddonScheduler.get_scheduler()
         #AddonScheduler.remove_all_jobs()
         if scheduler.running:
             scheduler.shutdown()
@@ -206,14 +221,17 @@ class SchedulerManagerView(BaseView):
     @expose("/start/")
     @has_access
     def start(self):
-        scheduler = AddonScheduler.get_scheduler()
-        if self.state_to_string[scheduler.state] == "STATE_STOPPED":
+        #scheduler = AddonScheduler.get_scheduler()
+        scheduler = AddonScheduler()
+        state_str = scheduler.get_state_str()
+        if state_str == "STATE_STOPPED":
             scheduler.start(paused=False)
         log.debug("APScheduler: adding selfcheck task")
-        selfcheck_job = AddonScheduler.get_job('selfcheck')
+        selfcheck_job = scheduler.get_job('selfcheck')
         if selfcheck_job:
             selfcheck_job.remove()
-        AddonScheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
-        db = ListOfOperations.db
-        ListOfOperations.reschedule_operations(db)
+        scheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
+        #db = ListOfOperations.db
+        #ListOfOperations.reschedule_operations(db)
+        # TODO: get dbsession, query all ops and send them to reschedule_operations
         return redirect(url_for('SchedulerManagerView.manager'))

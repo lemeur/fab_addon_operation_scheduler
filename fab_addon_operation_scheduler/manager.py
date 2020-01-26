@@ -2,9 +2,9 @@ import logging
 from flask_appbuilder.basemanager import BaseManager
 from flask_babel import lazy_gettext as _
 from flask import Blueprint, url_for
+from werkzeug.serving import is_running_from_reloader
 
 from .views import ScheduledOperationView, SchedulerManagerView
-from .models import SchedulableOperation
 from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL, scheduler_selfcheck
 
 #from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
@@ -32,7 +32,7 @@ class Config(object):
         'default': MemoryJobStore()
     }
 
-    SCHEDULER_API_ENABLED = True
+    SCHEDULER_API_ENABLED = False
 
 
 class OperationSchedulerManager(BaseManager):
@@ -53,21 +53,13 @@ class OperationSchedulerManager(BaseManager):
         self.addon_js = [('fab_addon_operation_scheduler.static', 'js/main.js')]
         self.addon_css = []
 
-        # Delete all SchedulableOperation at startup, 
-        # they will be registered programmatically by calling
-        # ListOfOperations.register_operation()
-        log.debug("APScheduler: removing SchedulableOperation")
-        dbsession = appbuilder.get_session()
-        dbsession.query(SchedulableOperation).delete()
-        dbsession.commit()
-        self.dbsession = dbsession
-
-        # Since the JobStore is not persistent we don't
-        # have to empty the JobStore (MemoryJobStore)
-
         # Define the new scheduler: a singleton
-        appbuilder.fab_addon_operation_scheduler_started = Value('b', False)
-        schedulerObj = AddonScheduler(appbuilder)
+        if is_running_from_reloader():
+            log.debug("Running from Reloader: not starting scheduler again")
+        else:
+            log.debug("Instantiating scheduler (if not already instanciated)")
+            schedulerObj = AddonScheduler(appbuilder)
+            self.addon_scheduler = schedulerObj
 
     @classmethod
     def set_last_check(cls, datestring):
@@ -89,22 +81,5 @@ class OperationSchedulerManager(BaseManager):
         self.appbuilder.get_app.register_blueprint(self.static_bp)
 
     def post_process(self):
-
-        # Run the scheduler
-        log.debug("APScheduler: starting scheduler")
-        AddonScheduler.start()
-
-        log.debug("APScheduler: adding selfcheck task")
-        selfcheck_job = AddonScheduler.get_job('selfcheck')
-        if selfcheck_job:
-            selfcheck_job.remove()
-        AddonScheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
-
-        # Reload ScheduledOperations
-        # ==> This can't be done at this time
-        # because functions may have not been registered yet.
-        # ==> This will be done at registration time
-
-        addon_instance = self
-        log.debug("Registered addon_instance with:"+str(addon_instance))
+        pass
 
