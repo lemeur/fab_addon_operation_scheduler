@@ -6,81 +6,10 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Date, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.exc import IntegrityError
 
-from .addon_scheduler import AddonScheduler
-
 import logging
 
 log = logging.getLogger(__name__)
 
-
-
-##class ListOfOperations:
-##    members = dict()
-##    db = None
-##
-##    @classmethod
-##    def register_operation(cls, db, name, description, func, args_schema={}):
-##        log.debug('APScheduler registering new function:'+name)
-##        cls.members[name]={'name': name, 'description': description, 'function': func, 'args_schema': args_schema}
-##        #try:
-##            #schedop = SchedulableOperation(name, description, json.dumps(args_schema))
-##            #cls.db= db
-##            #db.session.add(schedop)
-##            #db.session.commit()
-##        #except IntegrityError:
-##        #    log.debug("APScheduler already registered function:"+name)
-##        #    db.session.rollback()
-##
-##        #jobs_to_activate = db.session.query(ScheduledOperation).filter(ScheduledOperation.schedule_enabled == "Yes").filter(ScheduledOperation.operation_name == name).all()
-##        jobs_to_activate = db.session.query(ScheduledOperation).filter(ScheduledOperation.schedule_enabled == "Yes").filter(ScheduledOperation.operation == name).all()
-##        for j in jobs_to_activate:
-##            log.debug('APScheduler activating job "{}" for function "{}":'.format(str(j.id)+"-"+j.operation_name, name))
-##            scheduler = AddonScheduler()
-##            j.activate(scheduler)
-##
-##    @classmethod
-##    def list_names(cls):
-##        list_of_names = [k['name'] for k in cls.members]
-##        return list_of_names
-##
-##    @classmethod
-##    def reschedule_operations(cls, db):
-##        jobs_to_activate = db.session.query(ScheduledOperation).filter(ScheduledOperation.schedule_enabled == "Yes").all()
-##        scheduler = AddonScheduler()
-##        for j in jobs_to_activate:
-##            if j.operation_name in cls.members:
-##                j.activate(scheduler)
-##
-##    @classmethod
-##    def get_all(cls):
-##        return cls.members
-##
-##    @classmethod
-##    def get_one(cls, name):
-##        if name in cls.members:
-##            return cls.members[name]
-##        else:
-##            return None
-##
-##    @classmethod
-##    def get_dict(cls):
-##        res = {k:cls.members[k]['args_schema'] for k in cls.members}
-##        return res
-##            
-
-
-#class SchedulableOperation(Model):
-#    oper_name = Column(String(50), primary_key=True)
-#    oper_description = Column(String(500), nullable=True)
-#    oper_schema = Column(String(900), nullable=True)
-#
-#    def __init__(self, name, description, args_schema):
-#        self.oper_name = name
-#        self.oper_description = description
-#        self.oper_schema = args_schema
-#
-#    def __repr__(self):
-#        return self.oper_name
 
 class ScheduledOperation(Model):
     id = Column(Integer, primary_key=True)
@@ -102,6 +31,9 @@ class ScheduledOperation(Model):
 
         return "{} {}({})".format(self.operation_name, trigger, self.scheduler_args)
 
+    def get_dict(self):
+        return {'id':self.id, 'operation':self.operation, 'operation_args':self.operation_args, 'scheduler_args':self.scheduler_args}
+
     def activate(self, addon_scheduler):
         jobid = "{}-{}".format(str(self.id),self.operation)
         is_job_activated = addon_scheduler.is_job_activated(jobid)
@@ -119,12 +51,21 @@ class ScheduledOperation(Model):
                 addon_scheduler.remove_job(jobid)
                 self.status="Unregistered"
 
-            try:
-                addon_scheduler.add_job(jobid, operation_function, **taskSchedulerArgs, max_instances=6, kwargs=operation_args_dict)
-                self.status="Registered"
-            except Exception as e:
-                log.error("Error activating '{}' with error '{}'".format(self.operation_name, e))
-                self.status="Error '{}'".format(self.operation_name, e)
+            if self.operation_args:
+                try:
+                    operation_args_dict = json.loads(self.operation_args)
+                    addon_scheduler.add_job(jobid, operation_function, **taskSchedulerArgs, max_instances=6, kwargs=operation_args_dict)
+                    self.status="Registered"
+                except Exception as e:
+                    log.error("Error activating '{}' with error '{}'".format(self.operation_name, e))
+                    self.status="Error '{}'".format(self.operation_name, e)
+            else:
+                try:
+                    addon_scheduler.add_job(jobid, operation_function, **taskSchedulerArgs, max_instances=6)
+                    self.status="Registered"
+                except Exception as e:
+                    log.error("Error activating '{}' with error '{}'".format(self.operation_name, e))
+                    self.status="Error '{}'".format(self.operation_name, e)
         else:
             log.debug("APScheduler can't find oper function for:"+self.operation_name)
 

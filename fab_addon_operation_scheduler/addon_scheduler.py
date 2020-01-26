@@ -3,6 +3,7 @@ from threading import Thread
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers import SchedulerAlreadyRunningError
 from apscheduler.jobstores.base import ConflictingIdError
+from .models import ScheduledOperation
 
 from ilock import ILock, ILockException
 
@@ -69,12 +70,14 @@ class SchedulerService(rpyc.Service):
         try:
             with ILock('fab_addon_operation_manager_register_operation_lock', timeout=60):
                 log.debug("SchedulerService adding scheduler job '{}'".format(jobid))
-                if not self.activated_jobs.get(jobid,None):
-                    self.activated_jobs[jobid] = {'func':func, 'args': args, 'kwargs': kwargs} 
-                    new_job =  self.scheduler.add_job(jobid, func, *args, **kwargs)
-                    log.debug("AddonScheduler registered new function '{}'".format(jobid))
-                else:
-                    log.debug("AddonScheduler function '{}' already registered".format(jobid))
+                if self.activated_jobs.get(jobid,None):
+                    log.debug("AddonScheduler function '{}' already registered - first remove it".format(jobid))
+                    self.exposed_remove_job(jobid)
+
+                self.activated_jobs[jobid] = {'func':func, 'args': args, 'kwargs': kwargs} 
+                new_job =  self.scheduler.add_job(jobid, func, *args, **kwargs)
+                log.debug("AddonScheduler registered new function '{}'".format(jobid))
+
         except ILockException:
             log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_manager_register_operation_lock' for 60 seconds")
 
@@ -161,7 +164,7 @@ class SchedulerService(rpyc.Service):
                 log.debug("AddonScheduler is already started")
                 return "Already Started"
 
-    def exposed_register_operation(self, name, description, func, args_schema={}):
+    def exposed_register_operation(self, name, description, func, args_schema={}, related_job_schedules_dicts={} ):
         # Note that func is either a string representing an importable callable
         # or a callable that has been replaced by a netref by the RPyC call
         try:
@@ -176,6 +179,14 @@ class SchedulerService(rpyc.Service):
                 log.debug("AddonScheduler got Lock 'fab_addon_operation_manager_register_operation_lock'")
                 new_entry = {'name': name, 'description': description, 'function': func, 'args_schema': args_schema}
                 self.available_operations[name] = new_entry
+                for job in related_job_schedules_dicts:
+                    func = self.exposed_get_func(name)
+                    taskSchedulerArgs = json.loads(job.scheduler_args)
+                    if job.operation_args:
+                        operation_args_dict = json.loads(job.operation_args)
+                        self.exposed_add_job(job.id, func, **taskSchedulerArgs, max_instances=6, kwargs=operation_args_dict) 
+                    else:
+                        self.exposed_add_job(job.id, func, **taskSchedulerArgs, max_instances=6) 
         except ILockException:
             log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_manager_register_operation_lock' for 60 seconds")
         return new_entry
@@ -340,9 +351,13 @@ class AddonScheduler(object):
         else:
             log.debug("Can't start and run selfcheck until RPyC is started")
 
-    def register_operation(self, name, description, func, args_schema={}):
+    def register_operation(self, db, name, description, func, args_schema={}):
+        db_session = db.session
+        related_job_schedules = db_session.query(ScheduledOperation).filter(ScheduledOperation.operation == name).filter(ScheduledOperation.schedule_enabled=="Yes").all()
+        related_job_schedules_dicts = { j.id:j.get_dict()  for j in related_job_schedules}
+        
         conn = self.connect()
-        res = conn.root.register_operation(name, description, func, args_schema={})
+        res = conn.root.register_operation(name, description, func, args_schema={}, related_job_schedules_dicts=related_job_schedules_dicts)
         return res
 
     def get_operations_args_schemas(self):
