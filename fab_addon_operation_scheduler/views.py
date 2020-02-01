@@ -7,12 +7,14 @@ from wtforms import StringField, SelectField
 
 from flask_appbuilder import BaseView, expose, has_access
 
-from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL, scheduler_selfcheck
+from .addon_scheduler import AddonScheduler, SCHEDULER_TIMEZONE, SCHEDULER_SELFCHECK_INTERVAL 
+
+import time
 
 from datetime import datetime
 import pytz
 
-from fab_addon_turbowidgets.widgets import JsonEditorWidget
+from fab_addon_turbowidgets.widgets import JsonEditorWidget, DynamicSelectField
 
 from flask_appbuilder.actions import action
 
@@ -36,9 +38,17 @@ log = logging.getLogger(__name__)
 
 def get_operation_args_schema_js():
     addon_scheduler = AddonScheduler()
-    list_oper_schema_json = json.dumps(addon_scheduler.get_operations_args_schemas())
+    args_schemas_netref = addon_scheduler.get_operations_args_schemas()
+    print("TIBO type args_schemas_netref=",type(args_schemas_netref))
+    list_oper_schema_json = json.dumps(args_schemas_netref)
     before_js2 = "list_operations_schema = JSON.parse('{}')".format(list_oper_schema_json)
     return before_js2
+
+
+def get_availables_job_functions():
+    choices = [ (k,k) for k in AddonScheduler().get_available_operations() ]
+    log.debug("Called get_availables_job_functions => '{}'".format(repr(choices)))
+    return choices
 
 class ScheduledOperationView(ModelView):
     datamodel = SQLAInterface(ScheduledOperation)
@@ -87,17 +97,13 @@ class ScheduledOperationView(ModelView):
             "OperationArgs",
             widget=JsonEditorWidget("{}", before_js=get_operation_args_schema_js, after_js=after_js2, master_id="operation", extra_classes="fab_addon_operation_manager_opargs"),
         ),
-        "operation": SelectField(
-            choices=[ (k,k) for k in AddonScheduler().get_job_ids()]
+        "operation": DynamicSelectField(
+            choices_func=get_availables_job_functions
         )
     }
     add_form_extra_fields = edit_form_extra_fields
 
     list_columns = ['operation_name','schedule_enabled','status']
-
-    def prefill_form(form, pk):
-        print("TIBO TIBO")
-        form.operation.choices = ['a','b']
 
     @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def enableOperation(self, items):
@@ -162,7 +168,6 @@ class SchedulerManagerView(BaseView):
     @expose("/manager/")
     @has_access
     def manager(self):
-        #scheduler = AddonScheduler.get_scheduler()
         scheduler = AddonScheduler()
         state = scheduler.get_state()
         state_str = scheduler.get_state_str()
@@ -186,18 +191,15 @@ class SchedulerManagerView(BaseView):
                 'scheduler_jobs': jobs_str
             }
         ]
-        #return self.render_template("fab_addon_operation_scheduler/operation_scheduler_management.html", schedulers=schedulers_info)
         return self.render_template("operation_scheduler_management.html", scheduler_status= self.state_to_string[state], scheduler_jobs=jobs_info)
 
     @expose("/pause/")
     @has_access
     def pause(self):
-        #scheduler = AddonScheduler.get_scheduler()
         scheduler = AddonScheduler()
         #AddonScheduler.remove_all_jobs()
         scheduler.pause()
         return redirect(url_for('SchedulerManagerView.manager'))
-        #return redirect(self.get_redirect())
 
     @expose("/resume/")
     @has_access
@@ -208,30 +210,24 @@ class SchedulerManagerView(BaseView):
         return redirect(url_for('SchedulerManagerView.manager'))
         #return redirect(self.get_redirect())
 
-    @expose("/shutdown/")
-    @has_access
-    def shutdown(self):
-        scheduler = AddonScheduler()
-        #scheduler = AddonScheduler.get_scheduler()
-        #AddonScheduler.remove_all_jobs()
-        if scheduler.running:
-            scheduler.shutdown()
-        return redirect(url_for('SchedulerManagerView.manager'))
-
-    @expose("/start/")
-    @has_access
-    def start(self):
-        #scheduler = AddonScheduler.get_scheduler()
-        scheduler = AddonScheduler()
-        state_str = scheduler.get_state_str()
-        if state_str == "STATE_STOPPED":
-            scheduler.start(paused=False)
-        log.debug("APScheduler: adding selfcheck task")
-        selfcheck_job = scheduler.get_job('selfcheck')
-        if selfcheck_job:
-            selfcheck_job.remove()
-        scheduler.add_job('selfcheck', scheduler_selfcheck, trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
-        #db = ListOfOperations.db
-        #ListOfOperations.reschedule_operations(db)
-        # TODO: get dbsession, query all ops and send them to reschedule_operations
-        return redirect(url_for('SchedulerManagerView.manager'))
+##    @expose("/shutdown/")
+##    @has_access
+##    def shutdown(self):
+##        scheduler = AddonScheduler()
+##        #AddonScheduler.remove_all_jobs()
+##        if scheduler.get_state_str() == "STATE_RUNNING":
+##            scheduler.shutdown()
+##            #time.sleep(1)
+##        return redirect(url_for('SchedulerManagerView.manager'))
+##
+##    @expose("/start/")
+##    @has_access
+##    def start(self):
+##        #scheduler = AddonScheduler.get_scheduler()
+##        scheduler = AddonScheduler()
+##        state_str = scheduler.get_state_str()
+##        if state_str == "STATE_STOPPED":
+##            scheduler.start()
+##        log.debug("APScheduler: adding selfcheck task")
+##        scheduler.run_selfcheck()
+##        return redirect(url_for('SchedulerManagerView.manager'))

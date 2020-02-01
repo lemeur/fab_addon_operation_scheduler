@@ -12,20 +12,20 @@ function loadJsonEditorSlaves(elem) {
                     //console.log(JSON.stringify(master_schema))
                     //listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")
                     starting_value = $('#operation_args').attr('value')
-                    if (starting_value != "") {
-                        listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),starting_value,"{}")
+                    if (starting_value == "" || starting_value == "None") {
+                        listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")
                     }
                     else {
-                        listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),"{}","{}")
+                        listOfJsonEditors['operation_args'] = init_json_editor('operation_args',JSON.stringify(master_schema),starting_value,"{}")
                     }
                 }
         }
         else {
         }
         $('#' + master_id).on("change", function(e) {
-            if (e.val) {
+            if ($(e.target).val()) {
                 //console.log(list_operations_schema[e.val])
-                master_schema = list_operations_schema[e.val]
+                master_schema = list_operations_schema[$(e.target).val()]
                 theEditor = listOfJsonEditors['operation_args']
                 theEditor.destroy();
                 starting_value = $('#operation_args').attr({value: ""})

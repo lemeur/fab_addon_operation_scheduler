@@ -13,6 +13,7 @@ import rpyc
 import time
 from rpyc.utils.server import ThreadedServer
 from rpyc.utils.helpers import classpartial
+rpyc.core.protocol.DEFAULT_CONFIG['allow_pickle'] = True
 
 from datetime import datetime
 
@@ -37,8 +38,8 @@ class SchedulerService(rpyc.Service):
         self.activated_jobs = {}
 
         try:
-            with ILock('fab_addon_operation_manager_register_operation_lock', timeout=20):
-                log.debug("AddonScheduler got Lock 'fab_addon_operation_manager_register_operation_lock'")
+            with ILock('fab_addon_operation_scheduler_service_lock', timeout=20):
+                log.debug("AddonScheduler got Lock 'fab_addon_operation_scheduler_service_lock'")
 
                 if self.exposed_get_state_str() != "STATE_RUNNING":
                     log.debug("APScheduler: starting scheduler")
@@ -50,6 +51,7 @@ class SchedulerService(rpyc.Service):
             log.debug("SchedulerService: can't get ILock 'fab_addon_operation_manager_register_operation_lock'")
 
     def exposed_run_selfcheck(self):
+        self.exposed_register_operation('selfcheck', 'selfcheck', 'fab_addon_operation_scheduler.addon_scheduler:scheduler_selfcheck', args_schema={}, related_job_schedules_dicts={} )
         self.exposed_add_job('selfcheck', 'fab_addon_operation_scheduler.addon_scheduler:scheduler_selfcheck', trigger='interval', seconds=SCHEDULER_SELFCHECK_INTERVAL, max_instances=6, misfire_grace_time=SCHEDULER_SELFCHECK_INTERVAL)
 
     def exposed_add_job(self, jobid, func, *args, **kwargs):
@@ -59,18 +61,21 @@ class SchedulerService(rpyc.Service):
         if 'kwargs' in kwargs:
             # transform the rpyc-netref of the 'func' kwargs to a static dict
             inside_kwargs_netref = kwargs['kwargs']
-            inside_kwargs = {key: inside_kwargs_netref[key] for key in inside_kwargs_netref}
+            #inside_kwargs = {key: inside_kwargs_netref[key] for key in inside_kwargs_netref}
+            inside_kwargs = rpyc.classic.obtain(inside_kwargs_netref)
             kwargs['kwargs'] = inside_kwargs
         if 'args' in kwargs:
             # transform the rpyc-netref of the 'func' args to a static dict
             inside_args_netref = kwargs['args']
-            inside_args = {key: inside_args_netref[key] for key in inside_args_netref}
+            #inside_args = {key: inside_args_netref[key] for key in inside_args_netref}
+            inside_args = rpyc.classic.obtain(inside_args_netref)
             kwargs['args'] = inside_args
 
         try:
-            with ILock('fab_addon_operation_manager_register_operation_lock', timeout=60):
+            with ILock('fab_addon_operation_scheduler_service_data_lock', timeout=60):
                 log.debug("SchedulerService adding scheduler job '{}'".format(jobid))
-                if self.activated_jobs.get(jobid,None):
+                if self.exposed_is_job_activated(jobid):
+                    log.debug("AddonScheduler list of registered operations '{}'".format(";".join(self.activated_jobs)))
                     log.debug("AddonScheduler function '{}' already registered - first remove it".format(jobid))
                     self.exposed_remove_job(jobid)
 
@@ -79,7 +84,7 @@ class SchedulerService(rpyc.Service):
                 log.debug("AddonScheduler registered new function '{}'".format(jobid))
 
         except ILockException:
-            log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_manager_register_operation_lock' for 60 seconds")
+            log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_scheduler_service_data_lock' for 60 seconds")
 
     def exposed_modify_job(self, job_id, jobstore=None, **changes):
         if self.scheduler:
@@ -101,6 +106,11 @@ class SchedulerService(rpyc.Service):
     def exposed_remove_job(self, job_id, jobstore=None):
         if self.scheduler:
             self.scheduler.remove_job(job_id, jobstore)
+            try:
+                with ILock('fab_addon_operation_scheduler_service_data_lock', timeout=60):
+                    self.activated_jobs.pop(job_id, None)
+            except ILockException:
+                log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_scheduler_service_data_lock' for 60 seconds")
 
     def exposed_remove_all_jobs(self, jobstore=None):
         if self.scheduler:
@@ -115,7 +125,9 @@ class SchedulerService(rpyc.Service):
             return self.available_operations[oper_name]['function']
 
     def exposed_get_operations_args_schemas(self):
-        return { k:k['args_schema'] for k in self.available_operations}
+        res = { k:self.available_operations[k]['args_schema'] for k in self.available_operations}
+        log.debug("args_schemas="+repr(res))
+        return res
 
     def exposed_is_job_activated(self, job_id):
         if self.scheduler:
@@ -164,20 +176,34 @@ class SchedulerService(rpyc.Service):
                 log.debug("AddonScheduler is already started")
                 return "Already Started"
 
+    def exposed_get_available_operations(self):
+        res= None
+        try:
+            with ILock('fab_addon_operation_scheduler_service_data_lock', timeout=60):
+                opdict = self.available_operations 
+                res = { opdict[k]['name']: opdict[k]['description'] for k in opdict}
+        except ILockException:
+            log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_scheduler_service_data_lock' for 60 seconds")
+        return res
+        
+
     def exposed_register_operation(self, name, description, func, args_schema={}, related_job_schedules_dicts={} ):
         # Note that func is either a string representing an importable callable
         # or a callable that has been replaced by a netref by the RPyC call
         try:
             # RPyC servers spawns a new thread for each request
             # use a Lock to avoid conflicts when accessing th shared self.members attribute
-            with ILock('fab_addon_operation_manager_register_operation_lock', timeout=60):
+            with ILock('fab_addon_operation_scheduler_service_data_lock', timeout=60):
                 log.debug("SchedulerService register_operation new function '{}'".format(name))
                 new_entry = None
                 if self.available_operations.get(name, None):
                     log.debug("SchedulerService register_operation, function already exists:"+name)
                     return None
-                log.debug("AddonScheduler got Lock 'fab_addon_operation_manager_register_operation_lock'")
-                new_entry = {'name': name, 'description': description, 'function': func, 'args_schema': args_schema}
+                log.debug("AddonScheduler got Lock 'fab_addon_operation_scheduler_service_data_lock'")
+                #copy_args_schema = {k:args_schema[k] for k in args_schema}
+                copy_args_schema = rpyc.classic.obtain(args_schema)
+                log.debug("AddonScheduler registered Name='{}', args_schema='{}'".format(name,repr(copy_args_schema)))
+                new_entry = {'name': name, 'description': description, 'function': func, 'args_schema': copy_args_schema}
                 self.available_operations[name] = new_entry
                 for job in related_job_schedules_dicts:
                     func = self.exposed_get_func(name)
@@ -188,7 +214,7 @@ class SchedulerService(rpyc.Service):
                     else:
                         self.exposed_add_job(job.id, func, **taskSchedulerArgs, max_instances=6) 
         except ILockException:
-            log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_manager_register_operation_lock' for 60 seconds")
+            log.debug("AddonScheduler Error can't get Lock 'fab_addon_operation_scheduler_service_data_lock' for 60 seconds")
         return new_entry
             
 class AddonScheduler(object):
@@ -220,7 +246,7 @@ class AddonScheduler(object):
         def __start_rpyc_server(self, appbuilder):
                     # Check if rpyc Server is already running in another process on the same machine
                     # trying to instantiate one will fail because the port is already taken
-                    protocol_config = {'allow_public_attrs': True}
+                    protocol_config = {'allow_public_attrs': True, 'allow_pickle': True}
                     bgsched = BackgroundScheduler(timezone=SCHEDULER_TIMEZONE, daemon=True)
                     scheduler = APScheduler(scheduler=bgsched)
                     scheduler.init_app(appbuilder.get_app)
@@ -249,7 +275,7 @@ class AddonScheduler(object):
             retry_attempt=0
             while retry_attempt < 3 and not conn:
                 try:
-                    conn = rpyc.connect(SCHEDULER_RPYC_HOST, SCHEDULER_RPYC_PORT)
+                    conn = rpyc.connect(SCHEDULER_RPYC_HOST, SCHEDULER_RPYC_PORT, config=rpyc.core.protocol.DEFAULT_CONFIG)
                 except ConnectionRefusedError:
                     time.sleep(1)
 
@@ -292,7 +318,7 @@ class AddonScheduler(object):
             
     def add_job(self, jobid, func, *args, **kwargs):
         conn = self.connect()
-        ret = conn.root.add_job(func, *args, **kwargs)    
+        ret = conn.root.add_job(jobid, func, *args, **kwargs)    
         conn.close()
         return ret
             
@@ -331,9 +357,13 @@ class AddonScheduler(object):
         conn = self.connect()
         return conn.root.get_state()
 
+    def get_state_str(self):
+        conn = self.connect()
+        return conn.root.get_state_str()
+
     def pause(self):
-        self.__check_client_connection()
-        return self.client.root.pause()
+        conn = self.connect()
+        return conn.root.pause()
 
     def resume(self):
         conn = self.connect()
@@ -351,16 +381,28 @@ class AddonScheduler(object):
         else:
             log.debug("Can't start and run selfcheck until RPyC is started")
 
+    def get_available_operations(self):
+        conn = self.connect()
+        ops_netref = conn.root.get_available_operations()
+        ops = rpyc.classic.obtain(ops_netref)
+        return ops
+
     def register_operation(self, db, name, description, func, args_schema={}):
         db_session = db.session
         related_job_schedules = db_session.query(ScheduledOperation).filter(ScheduledOperation.operation == name).filter(ScheduledOperation.schedule_enabled=="Yes").all()
         related_job_schedules_dicts = { j.id:j.get_dict()  for j in related_job_schedules}
         
         conn = self.connect()
-        res = conn.root.register_operation(name, description, func, args_schema={}, related_job_schedules_dicts=related_job_schedules_dicts)
+        res = conn.root.register_operation(name, description, func, args_schema=args_schema, related_job_schedules_dicts=related_job_schedules_dicts)
         return res
 
     def get_operations_args_schemas(self):
         conn = self.connect()
         res = conn.root.get_operations_args_schemas()
+        return rpyc.classic.obtain(res)
+
+    def run_selfcheck(self):
+        conn = self.connect()
+        res = conn.root.run_selfcheck()
         return res
+    
