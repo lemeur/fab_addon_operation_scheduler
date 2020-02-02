@@ -103,7 +103,7 @@ class ScheduledOperationView(ModelView):
     }
     add_form_extra_fields = edit_form_extra_fields
 
-    list_columns = ['operation_name','schedule_enabled','status']
+    list_columns = ['operation','schedule_enabled','status']
 
     @action("enableOperation","Enable tasks scheduling","Confirm activation of selected tasks ?","fa-rocket", single=False, multiple=True)
     def enableOperation(self, items):
